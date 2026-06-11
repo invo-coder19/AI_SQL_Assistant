@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="AI SQL Assistant – Convert plain English into executable SQL queries instantly using AI." />
+  <meta name="keywords" content="AI, SQL, Natural Language, Query Generator, Flask, OpenAI" />
+  <title>AI SQL Assistant – Natural Language to SQL</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗄️</text></svg>" />
+</head>
+<body>
+
+  <!-- Animated background -->
+  <div class="bg-mesh" aria-hidden="true"></div>
+  <div class="orb orb-1" aria-hidden="true"></div>
+  <div class="orb orb-2" aria-hidden="true"></div>
+  <div class="orb orb-3" aria-hidden="true"></div>
+
+  <div id="app">
+
+    <!-- ===== HEADER ===== -->
+    <header class="header" role="banner">
+      <div class="header-brand">
+        <div class="brand-icon" aria-hidden="true">🗄️</div>
+        <div class="brand-text">
+          <h1>AI SQL Assistant</h1>
+          <p>Powered by OpenAI · Rule-based fallback</p>
+        </div>
+      </div>
+      <div class="header-badge">
+        <span class="badge badge-ai">
+          <span class="badge-dot" aria-label="Online"></span>
+          AI Ready
+        </span>
+      </div>
+    </header>
+
+    <!-- ===== MAIN ===== -->
+    <main class="main" role="main">
+
+      <!-- Hero -->
+      <section class="hero" aria-labelledby="heroTitle">
+        <h2 class="hero-title" id="heroTitle">
+          English to SQL,<br>
+          <span class="gradient-text">in one click.</span>
+        </h2>
+        <p class="hero-subtitle">
+          Type any database question in plain English and get a perfectly formatted, executable SQL query instantly.
+        </p>
+        <div class="stats-row" aria-label="Feature highlights">
+          <div class="stat-chip"><span>⚡</span> Instant Generation</div>
+          <div class="stat-chip"><span>🔍</span> Syntax Validation</div>
+          <div class="stat-chip"><span>📋</span> One-click Copy</div>
+          <div class="stat-chip"><span>🌐</span> OpenAI + Offline</div>
+        </div>
+      </section>
+
+      <!-- Workspace -->
+      <div class="workspace">
+
+        <!-- ── INPUT CARD ── -->
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">
+              <span class="icon">✏️</span> Your Query
+            </span>
+          </div>
+
+          <div class="input-wrapper">
+            <textarea
+              id="queryInput"
+              name="query"
+              rows="7"
+              maxlength="1000"
+              placeholder="Describe the query you want in plain English…&#10;&#10;e.g. Show all employees with salary greater than 50000"
+              aria-label="Natural language SQL query input"
+              autocomplete="off"
+              spellcheck="true"
+            ></textarea>
+          </div>
+          <div class="char-count" id="charCount" aria-live="polite">0 / 1000</div>
+
+          <!-- Example queries -->
+          <p class="examples-label">Try an example:</p>
+          <div class="examples-chips" role="list" aria-label="Example queries">
+            <button class="example-chip" role="listitem" data-query="Show all employees with salary greater than 50000">👔 Salary &gt; 50k</button>
+            <button class="example-chip" role="listitem" data-query="Find customers from Mumbai">📍 Customers from Mumbai</button>
+            <button class="example-chip" role="listitem" data-query="Count total orders placed this month">📦 Orders this month</button>
+            <button class="example-chip" role="listitem" data-query="Show top 10 products by sales">🏆 Top 10 products</button>
+            <button class="example-chip" role="listitem" data-query="List students who scored above 80 marks">🎓 Students &gt; 80</button>
+            <button class="example-chip" role="listitem" data-query="Find average salary by department">📊 Avg salary by dept</button>
+          </div>
+
+          <!-- Buttons -->
+          <div class="btn-group">
+            <button class="btn btn-primary" id="generateBtn" aria-label="Generate SQL from input">
+              <span id="btnIcon">⚡</span>
+              <span id="btnText">Generate SQL</span>
+            </button>
+            <button class="btn btn-secondary" id="clearBtn" aria-label="Clear all input and output">
+              🗑️ Clear
+            </button>
+          </div>
+
+          <!-- Error banner -->
+          <div class="error-banner" id="errorBanner" role="alert" aria-live="assertive">
+            <span>⚠️</span>
+            <span id="errorText">Something went wrong.</span>
+          </div>
+        </div>
+
+        <!-- ── OUTPUT CARD ── -->
+        <div class="card output-card">
+          <div class="card-header">
+            <span class="card-title">
+              <span class="icon">📄</span> Generated SQL
+            </span>
+            <span class="method-badge" id="methodBadge" aria-label="Generation method"></span>
+          </div>
+
+          <!-- Placeholder (shown when no result yet) -->
+          <div class="output-placeholder" id="outputPlaceholder" aria-hidden="false">
+            <div class="placeholder-icon">🗄️</div>
+            <p class="placeholder-text">Your SQL will appear here after generation.</p>
+          </div>
+
+          <!-- SQL Result -->
+          <div class="sql-result-wrapper" id="sqlResultWrapper" aria-live="polite">
+            <div class="sql-topbar">
+              <div class="sql-lang-tag">
+                <span class="dot dot-red"></span>
+                <span class="dot dot-yellow"></span>
+                <span class="dot dot-green"></span>
+                &nbsp;&nbsp;SQL
+              </div>
+              <div class="sql-topbar-actions">
+                <button class="btn-icon" id="copyBtn" aria-label="Copy SQL to clipboard">
+                  📋 Copy
+                </button>
+              </div>
+            </div>
+            <div class="sql-code-block">
+              <code id="sqlOutput" aria-label="Generated SQL query"></code>
+            </div>
+          </div>
+
+          <!-- Validation panel -->
+          <div class="validation-panel" id="validationPanel" aria-label="SQL validation results">
+            <div class="validation-item" id="valSelect"><span class="validation-icon">○</span> Contains SELECT or aggregate</div>
+            <div class="validation-item" id="valFrom"><span class="validation-icon">○</span> Contains FROM clause</div>
+            <div class="validation-item" id="valSemicolon"><span class="validation-icon">○</span> Ends with semicolon</div>
+            <div class="validation-item" id="valKeywords"><span class="validation-icon">○</span> Keywords are uppercase</div>
+          </div>
+        </div>
+
+      </div><!-- /workspace -->
+
+      <!-- ── HISTORY ── -->
+      <section class="history-section" aria-labelledby="historyTitle">
+        <p class="section-title" id="historyTitle">
+          <span>🕑</span> Recent Queries
+        </p>
+        <div class="history-list" id="historyList" role="list">
+          <p class="history-empty" id="historyEmpty">No queries yet. Generate your first SQL above!</p>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer" role="contentinfo">
+      <span>Natural Language to SQL Converter</span>
+      <span>·</span>
+      <span>Built with <span class="footer-heart" aria-label="love">❤️</span> using Flask &amp; OpenAI</span>
+    </footer>
+
+  </div><!-- /#app -->
+
+  <!-- Toast container -->
+  <div class="toast-container" id="toastContainer" aria-live="polite" aria-atomic="false"></div>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
