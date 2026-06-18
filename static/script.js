@@ -127,11 +127,11 @@ async function generateSQL() {
     lastSQL = data.sql || '';
     displayResult(lastSQL, data.method || 'rule-based');
     addToHistory(query, lastSQL);
-    showToast('✅ SQL generated successfully!', 'success');
+    showToast('SQL generated successfully', 'success');
 
   } catch (err) {
     showError(err.message || 'Failed to generate SQL. Please try again.');
-    showToast('❌ Generation failed.', 'error');
+    showToast('Generation failed — try again', 'error');
   } finally {
     setLoadingState(false);
   }
@@ -254,12 +254,12 @@ async function copySQL() {
 
   try {
     await navigator.clipboard.writeText(lastSQL);
-    copyBtn.textContent = '✅ Copied!';
+    copyBtn.textContent = '✓ Copied';
     copyBtn.classList.add('copied');
-    showToast('📋 SQL copied to clipboard!', 'success');
+    showToast('SQL copied to clipboard', 'success');
 
     setTimeout(() => {
-      copyBtn.textContent = '📋 Copy';
+      copyBtn.textContent = '⎘ Copy';
       copyBtn.classList.remove('copied');
     }, 2000);
   } catch {
@@ -272,7 +272,7 @@ async function copySQL() {
     ta.select();
     document.execCommand('copy');
     document.body.removeChild(ta);
-    showToast('📋 SQL copied!', 'success');
+    showToast('SQL copied', 'success');
   }
 }
 

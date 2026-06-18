@@ -9,6 +9,12 @@
 
 ---
 
+## 🖼️ Preview
+
+![AI SQL Assistant Preview](screenshots/preview.png)
+
+---
+
 ## ✨ Features
 
 | Feature | Description |
@@ -115,7 +121,7 @@ Find average salary by department
 - **Backend:** Python · Flask · Flask-CORS
 - **AI:** OpenAI GPT-3.5-turbo · Rule-based NLP fallback
 - **Frontend:** Vanilla HTML · CSS · JavaScript
-- **Design:** Dark glassmorphism · JetBrains Mono · Inter
+- **Design:** Minimal dark theme · Green / Grey / Black · JetBrains Mono · Inter
 
 ---
 

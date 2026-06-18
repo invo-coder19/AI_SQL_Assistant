@@ -11,12 +11,6 @@
 </head>
 <body>
 
-  <!-- Animated background -->
-  <div class="bg-mesh" aria-hidden="true"></div>
-  <div class="orb orb-1" aria-hidden="true"></div>
-  <div class="orb orb-2" aria-hidden="true"></div>
-  <div class="orb orb-3" aria-hidden="true"></div>
-
   <div id="app">
 
     <!-- ===== HEADER ===== -->
@@ -28,12 +22,6 @@
           <p>Powered by OpenAI · Rule-based fallback</p>
         </div>
       </div>
-      <div class="header-badge">
-        <span class="badge badge-ai">
-          <span class="badge-dot" aria-label="Online"></span>
-          AI Ready
-        </span>
-      </div>
     </header>
 
     <!-- ===== MAIN ===== -->
@@ -42,17 +30,17 @@
       <!-- Hero -->
       <section class="hero" aria-labelledby="heroTitle">
         <h2 class="hero-title" id="heroTitle">
-          English to SQL,<br>
-          <span class="gradient-text">in one click.</span>
+          Plain English to SQL,<br>
+          <span class="gradient-text">in seconds.</span>
         </h2>
         <p class="hero-subtitle">
-          Type any database question in plain English and get a perfectly formatted, executable SQL query instantly.
+          Describe any database question naturally and get a clean, executable SQL query instantly — powered by AI.
         </p>
         <div class="stats-row" aria-label="Feature highlights">
           <div class="stat-chip"><span>⚡</span> Instant Generation</div>
-          <div class="stat-chip"><span>🔍</span> Syntax Validation</div>
-          <div class="stat-chip"><span>📋</span> One-click Copy</div>
-          <div class="stat-chip"><span>🌐</span> OpenAI + Offline</div>
+          <div class="stat-chip"><span>✔</span> Syntax Validation</div>
+          <div class="stat-chip"><span>⎘</span> One-click Copy</div>
+          <div class="stat-chip"><span>◈</span> OpenAI + Offline</div>
         </div>
       </section>
 
@@ -63,7 +51,7 @@
         <div class="card">
           <div class="card-header">
             <span class="card-title">
-              <span class="icon">✏️</span> Your Query
+              <span class="icon">✏</span> Your Query
             </span>
           </div>
 
@@ -84,12 +72,12 @@
           <!-- Example queries -->
           <p class="examples-label">Try an example:</p>
           <div class="examples-chips" role="list" aria-label="Example queries">
-            <button class="example-chip" role="listitem" data-query="Show all employees with salary greater than 50000">👔 Salary &gt; 50k</button>
-            <button class="example-chip" role="listitem" data-query="Find customers from Mumbai">📍 Customers from Mumbai</button>
-            <button class="example-chip" role="listitem" data-query="Count total orders placed this month">📦 Orders this month</button>
-            <button class="example-chip" role="listitem" data-query="Show top 10 products by sales">🏆 Top 10 products</button>
-            <button class="example-chip" role="listitem" data-query="List students who scored above 80 marks">🎓 Students &gt; 80</button>
-            <button class="example-chip" role="listitem" data-query="Find average salary by department">📊 Avg salary by dept</button>
+            <button class="example-chip" role="listitem" data-query="Show all employees with salary greater than 50000">Salary &gt; 50k</button>
+            <button class="example-chip" role="listitem" data-query="Find customers from Mumbai">Customers from Mumbai</button>
+            <button class="example-chip" role="listitem" data-query="Count total orders placed this month">Orders this month</button>
+            <button class="example-chip" role="listitem" data-query="Show top 10 products by sales">Top 10 products</button>
+            <button class="example-chip" role="listitem" data-query="List students who scored above 80 marks">Students &gt; 80</button>
+            <button class="example-chip" role="listitem" data-query="Find average salary by department">Avg salary by dept</button>
           </div>
 
           <!-- Buttons -->
@@ -99,13 +87,13 @@
               <span id="btnText">Generate SQL</span>
             </button>
             <button class="btn btn-secondary" id="clearBtn" aria-label="Clear all input and output">
-              🗑️ Clear
+              Clear
             </button>
           </div>
 
           <!-- Error banner -->
           <div class="error-banner" id="errorBanner" role="alert" aria-live="assertive">
-            <span>⚠️</span>
+            <span>⚠</span>
             <span id="errorText">Something went wrong.</span>
           </div>
         </div>
@@ -114,12 +102,12 @@
         <div class="card output-card">
           <div class="card-header">
             <span class="card-title">
-              <span class="icon">📄</span> Generated SQL
+              <span class="icon">◧</span> Generated SQL
             </span>
             <span class="method-badge" id="methodBadge" aria-label="Generation method"></span>
           </div>
 
-          <!-- Placeholder (shown when no result yet) -->
+          <!-- Placeholder -->
           <div class="output-placeholder" id="outputPlaceholder" aria-hidden="false">
             <div class="placeholder-icon">🗄️</div>
             <p class="placeholder-text">Your SQL will appear here after generation.</p>
@@ -132,11 +120,11 @@
                 <span class="dot dot-red"></span>
                 <span class="dot dot-yellow"></span>
                 <span class="dot dot-green"></span>
-                &nbsp;&nbsp;SQL
+                &nbsp;SQL
               </div>
               <div class="sql-topbar-actions">
                 <button class="btn-icon" id="copyBtn" aria-label="Copy SQL to clipboard">
-                  📋 Copy
+                  ⎘ Copy
                 </button>
               </div>
             </div>
@@ -159,7 +147,7 @@
       <!-- ── HISTORY ── -->
       <section class="history-section" aria-labelledby="historyTitle">
         <p class="section-title" id="historyTitle">
-          <span>🕑</span> Recent Queries
+          <span>↺</span> Recent Queries
         </p>
         <div class="history-list" id="historyList" role="list">
           <p class="history-empty" id="historyEmpty">No queries yet. Generate your first SQL above!</p>
@@ -168,12 +156,6 @@
 
     </main>
 
-    <!-- ===== FOOTER ===== -->
-    <footer class="footer" role="contentinfo">
-      <span>Natural Language to SQL Converter</span>
-      <span>·</span>
-      <span>Built with <span class="footer-heart" aria-label="love">❤️</span> using Flask &amp; OpenAI</span>
-    </footer>
 
   </div><!-- /#app -->
 
