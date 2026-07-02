@@ -1,6 +1,6 @@
 /* ================================================================
    style.css – AI SQL Assistant
-   Minimal Modern Theme · Green / Grey / Black / White
+   Refined Dark Theme · Green / Grey / Black / White
    ================================================================ */
 
 /* ---------- Google Fonts ---------- */
@@ -8,7 +8,7 @@
 
 /* ---------- CSS Custom Properties ---------- */
 :root {
-  /* Core palette – green/grey/black/white */
+  /* Core palette */
   --black:          #0d0f0e;
   --surface-0:      #111412;
   --surface-1:      #161a17;
@@ -98,9 +98,6 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* no background overlay */
-
-
 /* ---------- App wrapper ---------- */
 #app {
   position: relative;
@@ -160,38 +157,6 @@ body {
   font-weight: 500;
 }
 
-/* Status pill */
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 5px 12px;
-  border-radius: 100px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  border: 1px solid;
-}
-
-.badge-ai {
-  background: rgba(46, 168, 98, 0.1);
-  color: var(--green-300);
-  border-color: var(--accent-border);
-}
-
-.badge-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--green-400);
-  animation: blink 2.4s ease-in-out infinite;
-}
-
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
-
 /* ================================================================
    MAIN
    ================================================================ */
@@ -209,6 +174,17 @@ body {
 .hero {
   text-align: center;
   padding: 12px 0 52px;
+  position: relative;
+}
+
+/* Subtle radial glow behind the hero text */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: -60px -120px 0;
+  background: radial-gradient(ellipse at 50% 60%, rgba(46, 168, 98, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: -1;
 }
 
 .hero-title {
@@ -221,7 +197,10 @@ body {
 }
 
 .gradient-text {
-  color: var(--green-300);
+  background: linear-gradient(135deg, var(--green-300) 0%, var(--green-200) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .hero-subtitle {
@@ -290,7 +269,8 @@ body {
 }
 
 .card:hover {
-  border-color: var(--border-hover);
+  border-color: rgba(46, 168, 98, 0.18);
+  box-shadow: 0 0 0 1px rgba(46, 168, 98, 0.06), var(--shadow-md);
 }
 
 .card-header {
@@ -430,6 +410,7 @@ body {
 
 .btn-primary:hover {
   background: var(--green-400);
+  box-shadow: 0 4px 16px rgba(46,168,98,0.3);
   transform: translateY(-1px);
 }
 
@@ -466,6 +447,29 @@ body {
 }
 
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Keyboard shortcut hint */
+.shortcut-hint {
+  margin-top: 10px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 5px;
+  background: var(--surface-3);
+  border: 1px solid var(--grey-dark);
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.64rem;
+  color: var(--text-3);
+  line-height: 1.5;
+}
 
 /* ================================================================
    ERROR BANNER
@@ -512,6 +516,12 @@ body {
   font-size: 2.4rem;
   opacity: 0.2;
   filter: grayscale(1);
+  animation: placeholderPulse 3s ease-in-out infinite;
+}
+
+@keyframes placeholderPulse {
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50%       { opacity: 0.32; transform: scale(1.06); }
 }
 
 .placeholder-text {
@@ -610,8 +620,6 @@ body {
 .op  { color: var(--sql-op);  }
 .fn  { color: var(--sql-fn);  font-weight: 500; }
 .cm  { color: var(--sql-cm);  font-style: italic; }
-.tbl { color: var(--green-200); }
-.col { color: var(--white-dim); }
 
 /* ── Method badge ── */
 .method-badge {
@@ -626,8 +634,8 @@ body {
 }
 
 .method-badge.visible { display: inline-flex; }
-.method-badge.openai  { background: rgba(46,168,98,0.1); color: var(--green-300); border-color: rgba(46,168,98,0.28); }
-.method-badge.rule    { background: rgba(168,140,46,0.1); color: #c4a040; border-color: rgba(168,140,46,0.28); }
+.method-badge.openai  { background: rgba(46,168,98,0.1);  color: var(--green-300); border-color: rgba(46,168,98,0.28);  }
+.method-badge.rule    { background: rgba(168,140,46,0.1); color: #c4a040;          border-color: rgba(168,140,46,0.28); }
 
 /* ================================================================
    VALIDATION PANEL
@@ -731,14 +739,8 @@ body {
   letter-spacing: 0.02em;
 }
 
-.footer-heart {
-  color: #c47070;
-  animation: heartbeat 1.8s ease-in-out infinite;
-}
-
-@keyframes heartbeat {
-  0%, 100% { transform: scale(1); }
-  50%       { transform: scale(1.25); }
+.footer-sep {
+  opacity: 0.35;
 }
 
 /* ================================================================
@@ -773,6 +775,14 @@ body {
 .toast.success { border-color: rgba(46,168,98,0.3); }
 .toast.error   { border-color: rgba(224,96,96,0.3); }
 
+.toast-icon {
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.toast.success .toast-icon { color: var(--green-300); }
+.toast.error   .toast-icon { color: #e08080; }
+
 @keyframes toastIn {
   from { opacity: 0; transform: translateX(32px) scale(0.92); }
   to   { opacity: 1; transform: translateX(0) scale(1); }
@@ -799,12 +809,12 @@ body {
    RESPONSIVE
    ================================================================ */
 @media (max-width: 640px) {
-  .header     { padding: 0 20px; }
-  .main       { padding: 32px 20px 20px; }
-  .footer     { padding: 18px 20px; }
-  .hero-title { font-size: 1.75rem; }
-  .btn-group  { flex-direction: column; }
+  .header       { padding: 0 20px; }
+  .main         { padding: 32px 20px 20px; }
+  .footer       { padding: 18px 20px; flex-wrap: wrap; }
+  .hero-title   { font-size: 1.75rem; }
+  .btn-group    { flex-direction: column; }
   .btn-secondary { flex: 1; }
-  .stats-row  { gap: 7px; }
-  .card       { padding: 18px; }
+  .stats-row    { gap: 7px; }
+  .card         { padding: 18px; }
 }

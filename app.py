@@ -8,16 +8,19 @@ import os
 import logging
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from dotenv import load_dotenv
 from services.sql_generator import generate_sql
+
+# Load environment variables from .env (no-op if the file is absent)
+load_dotenv()
 
 # ---------------------------------------------------------------------------
 # App setup
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__)
-CORS(app)  # Allow cross-origin requests (useful for development)
+CORS(app)
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
@@ -39,7 +42,7 @@ def index():
 def generate():
     """
     POST /generate
-    Body: { "query": "<natural language query>" }
+    Body:    { "query": "<natural language query>" }
     Returns: { "sql": "<SQL statement>", "method": "openai|rule-based" }
           or { "error": "<error message>" }
     """

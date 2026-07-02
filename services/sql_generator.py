@@ -2,32 +2,16 @@
 sql_generator.py
 ----------------
 AI-powered SQL generation service.
+
 Supports:
-  - OpenAI Chat Completions API (preferred, model configurable via env)
-  - Rule-based fallback (no API key required)
+  - OpenAI Chat Completions API  (preferred; model configurable via OPENAI_MODEL env var)
+  - Rule-based fallback           (no API key required)
 
-Changes vs. previous version
------------------------------
-Bug fixes
-  1. Removed walrus-operator misuse inside re.search() call (line ~211).
-  2. Fixed aggregate comparison: use `==` instead of `in (tuple,)`.
-  3. Fixed ORDER keyword detection – was using `kw in q.split()` which
-     missed words adjacent to punctuation; now uses a proper word-boundary
-     regex.
-  4. Numeric condition patterns that have only ONE capture group (i.e. the
-     field cannot be extracted from the pattern itself) now safely fall back
-     to _guess_numeric_field; a None result is guarded against.
-  5. "last N" in _extract_limit was silently adding a meaningless LIMIT;
-     it is now handled together with "last" ordering (DESC + LIMIT).
-  6. OpenAI model is now configurable via OPENAI_MODEL env var (default
-     gpt-4o-mini, not the deprecated gpt-3.5-turbo).
-
-New: SQL output tuner / post-processor (SQLOutputTuner)
+Output is post-processed by SQLOutputTuner which:
   - Strips accidental markdown code fences
   - Uppercases all SQL keywords and functions
-  - Normalises whitespace (collapses runs, trims blank lines)
-  - Adds a trailing semicolon if missing
-  - Pretty-prints major SQL clauses onto separate indented lines
+  - Normalises whitespace and adds a trailing semicolon
+  - Pretty-prints major clauses onto separate indented lines
   - Standardises comparison operators (e.g. `< >` → `<>`)
   - Removes duplicate consecutive WHERE/AND conditions
   - Collapses redundant parentheses around simple literals
@@ -97,10 +81,8 @@ class SQLOutputTuner:
     8. Collapse trivial single-value parentheses
     """
 
-    # ── 1. Strip markdown fences ──────────────────────────────────────────
     _FENCE_RE = re.compile(r"^```[a-zA-Z]*\n?|\n?```$", re.MULTILINE)
 
-    # ── 6. Operator normalisation map ─────────────────────────────────────
     _OP_MAP = [
         (re.compile(r"<\s*>"),   "<>"),
         (re.compile(r"!\s*="),   "!="),
@@ -120,50 +102,33 @@ class SQLOutputTuner:
         sql = self._collapse_trivial_parens(sql)
         return sql.strip()
 
-    # ── helpers ───────────────────────────────────────────────────────────
-
     def _strip_fences(self, sql: str) -> str:
         return self._FENCE_RE.sub("", sql).strip()
 
     def _uppercase_keywords(self, sql: str) -> str:
-        """
-        Uppercase SQL keywords and functions while leaving string literals
-        and identifiers untouched.
-        """
-        # Tokenise around string literals so we don't alter them
+        """Uppercase SQL keywords and functions, leaving string literals untouched."""
         parts = re.split(r"('(?:[^'\\]|\\.)*')", sql)
         result = []
         for i, part in enumerate(parts):
             if i % 2 == 1:
-                # Inside a string literal – leave as-is
                 result.append(part)
             else:
-                # Outside a literal – uppercase known tokens
                 def _up(m: re.Match) -> str:
                     word = m.group(0)
                     upper = word.upper()
-                    if upper in _SQL_KEYWORDS or upper in _SQL_FUNCTIONS:
-                        return upper
-                    return word
+                    return upper if upper in _SQL_KEYWORDS or upper in _SQL_FUNCTIONS else word
                 result.append(re.sub(r"\b[A-Za-z_][A-Za-z_0-9]*\b", _up, part))
         return "".join(result)
 
     def _normalise_whitespace(self, sql: str) -> str:
         """Collapse runs of blanks (but keep newlines for now)."""
-        # Collapse multiple spaces on the same line
         sql = re.sub(r"[ \t]+", " ", sql)
-        # Collapse multiple blank lines
         sql = re.sub(r"\n{3,}", "\n\n", sql)
-        # Strip trailing whitespace on each line
         sql = "\n".join(line.rstrip() for line in sql.splitlines())
         return sql.strip()
 
     def _pretty_print(self, sql: str) -> str:
-        """
-        Collapse the SQL to a single logical line first, then re-insert
-        newlines + 4-space indents before each major clause keyword.
-        """
-        # Flatten to one line (preserving string literals)
+        """Flatten SQL to one logical line, then re-insert newlines before major clauses."""
         parts = re.split(r"('(?:[^'\\]|\\.)*')", sql)
         flat_parts = []
         for i, part in enumerate(parts):
@@ -173,16 +138,12 @@ class SQLOutputTuner:
                 flat_parts.append(re.sub(r"\s+", " ", part))
         flat = "".join(flat_parts).strip()
 
-        # Now break at clause boundaries
         def _insert_break(m: re.Match) -> str:
-            kw = m.group(0).upper()
-            # Collapse internal whitespace in multi-word keywords
-            kw = re.sub(r"\s+", " ", kw)
+            kw = re.sub(r"\s+", " ", m.group(0).upper())
             return f"\n    {kw}"
 
         formatted = _CLAUSE_PATTERN.sub(_insert_break, flat)
 
-        # The very first token (SELECT / INSERT / …) should not be indented
         lines = formatted.splitlines()
         if lines and lines[0].startswith("    "):
             lines[0] = lines[0].lstrip()
@@ -208,17 +169,13 @@ class SQLOutputTuner:
         return "".join(result)
 
     def _deduplicate_conditions(self, sql: str) -> str:
-        """
-        Remove exact-duplicate AND/OR conditions in a WHERE clause.
-        e.g.  WHERE a = 1 AND a = 1  →  WHERE a = 1
-        """
+        """Remove exact-duplicate AND/OR conditions in a WHERE/HAVING clause."""
         def _dedup_clause(m: re.Match) -> str:
-            intro = m.group(1)   # "WHERE " or "HAVING "
+            intro = m.group(1)
             body  = m.group(2)
-            # Split on AND/OR keeping the separator
             tokens = re.split(r"\s+(AND|OR)\s+", body, flags=re.IGNORECASE)
-            seen:  list[str] = []
-            ops:   list[str] = []
+            seen: list[str] = []
+            ops:  list[str] = []
             for j, tok in enumerate(tokens):
                 if j % 2 == 0:
                     norm = tok.strip()
@@ -227,29 +184,22 @@ class SQLOutputTuner:
                 else:
                     ops.append(tok.upper())
 
-            # Rebuild
             rebuilt = seen[0]
             for k, op in enumerate(ops):
                 if k + 1 < len(seen):
                     rebuilt += f" {op} {seen[k + 1]}"
             return intro + rebuilt
 
-        sql = re.sub(
+        return re.sub(
             r"((?:WHERE|HAVING)\s+)((?:.|\n)+?)(?=\n\s*(?:GROUP|ORDER|LIMIT|OFFSET|UNION|;|$))",
             _dedup_clause,
             sql,
             flags=re.IGNORECASE,
         )
-        return sql
 
     def _collapse_trivial_parens(self, sql: str) -> str:
-        """
-        Replace ( simple_value ) with simple_value where the parentheses
-        add no semantic value — e.g. COUNT( * ) → COUNT(*).
-        """
-        # Fix COUNT( * ) → COUNT(*)
+        """Collapse redundant whitespace inside parentheses, e.g. COUNT( * ) → COUNT(*)."""
         sql = re.sub(r"COUNT\s*\(\s*\*\s*\)", "COUNT(*)", sql, flags=re.IGNORECASE)
-        # Collapse (   value   ) → (value) for literals / plain identifiers
         sql = re.sub(r"\(\s*([A-Za-z0-9_.]+)\s*\)", r"(\1)", sql)
         return sql
 
@@ -262,19 +212,28 @@ _tuner = SQLOutputTuner()
 # OpenAI helper
 # ---------------------------------------------------------------------------
 
+# Singleton client — constructed once when the module loads (if a key exists)
+_openai_client: openai.OpenAI | None = None
+
+
+def _get_openai_client() -> openai.OpenAI:
+    """Return (or lazily create) the module-level OpenAI client."""
+    global _openai_client
+    if _openai_client is None:
+        api_key = os.getenv("OPENAI_API_KEY", "")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is not set.")
+        _openai_client = openai.OpenAI(api_key=api_key)
+    return _openai_client
+
+
 def _generate_with_openai(natural_query: str) -> str:
     """
     Call the OpenAI Chat Completions API to convert a natural-language query
     into a well-formatted SQL statement.
     """
-    api_key = os.getenv("OPENAI_API_KEY", "")
-    if not api_key:
-        raise ValueError("OPENAI_API_KEY environment variable is not set.")
-
-    # Allow model override via env; default to a modern, cost-effective model
     model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-
-    client = openai.OpenAI(api_key=api_key)
+    client = _get_openai_client()
 
     system_prompt = (
         "You are an expert SQL developer. "
@@ -297,13 +256,11 @@ def _generate_with_openai(natural_query: str) -> str:
             {"role": "system", "content": system_prompt},
             {"role": "user",   "content": natural_query},
         ],
-        temperature=0.1,   # lower = more deterministic / less hallucination
+        temperature=0.1,
         max_tokens=768,
     )
 
     raw_sql = response.choices[0].message.content.strip()
-
-    # Run through the output tuner regardless of what the model returned
     return _tuner.tune(raw_sql)
 
 
@@ -311,25 +268,41 @@ def _generate_with_openai(natural_query: str) -> str:
 # Rule-based fallback
 # ---------------------------------------------------------------------------
 
+# Set of known entity nouns used by _extract_table; used to guard the city
+# matcher so that "FROM employees" does not generate city = 'Employees'.
+_ENTITY_NOUNS = {
+    "employee", "employees", "staff", "worker", "workers",
+    "customer", "customers", "client", "clients",
+    "order", "orders", "product", "products", "item", "items",
+    "student", "students", "user", "users",
+    "sale", "sales", "invoice", "invoices",
+    "department", "departments", "transaction", "transactions",
+    "record", "records", "report", "reports",
+    "account", "accounts", "payment", "payments",
+    "project", "projects", "supplier", "suppliers",
+    "vendor", "vendors",
+}
+
+
 class RuleBasedSQLGenerator:
     """
     A pattern-matching SQL generator used when no OpenAI key is configured.
-    Handles common English query patterns.
+    Handles common English query patterns and produces well-formatted SQL
+    via SQLOutputTuner.
     """
 
-    # ---------- keyword maps ----------
     AGGREGATE_MAP = {
-        "count":   "COUNT(*)",
-        "total":   "COUNT(*)",
-        "number":  "COUNT(*)",
-        "how many":"COUNT(*)",
-        "sum":     "SUM",
-        "average": "AVG",
-        "avg":     "AVG",
-        "maximum": "MAX",
-        "max":     "MAX",
-        "minimum": "MIN",
-        "min":     "MIN",
+        "count":    "COUNT(*)",
+        "total":    "COUNT(*)",
+        "number":   "COUNT(*)",
+        "how many": "COUNT(*)",
+        "sum":      "SUM",
+        "average":  "AVG",
+        "avg":      "AVG",
+        "maximum":  "MAX",
+        "max":      "MAX",
+        "minimum":  "MIN",
+        "min":      "MIN",
     }
 
     ORDER_KEYWORDS = {
@@ -341,20 +314,11 @@ class RuleBasedSQLGenerator:
         "least":    "ASC",
     }
 
-    # Common field synonyms → canonical column name
-    FIELD_ALIASES = {
-        "salary":   "salary",
-        "age":      "age",
-        "score":    "score",
-        "marks":    "marks",
-        "revenue":  "revenue",
-        "sales":    "sales",
-        "price":    "price",
-        "amount":   "amount",
-        "quantity": "quantity",
-        "rating":   "rating",
-        "grade":    "grade",
-        "points":   "points",
+    # Numeric field synonyms recognised in the query text
+    _NUMERIC_FIELDS = {
+        "salary", "age", "score", "marks", "revenue",
+        "sales", "price", "amount", "quantity", "rating",
+        "grade", "points",
     }
 
     def generate(self, query: str) -> str:
@@ -367,34 +331,26 @@ class RuleBasedSQLGenerator:
         aggregate  = self._extract_aggregate(q)
         group_by   = self._extract_group_by(q)
 
-        # "last N" → ORDER BY id DESC LIMIT N (fix: was only LIMIT)
+        # "last N" → ORDER BY id DESC LIMIT N
         last_m = re.search(r"\blast\s+(\d+)\b", q)
         if last_m and limit is None:
             limit = last_m.group(1)
             if order is None:
                 order = "id DESC"
 
-        # Build SELECT clause
         select_clause = f"SELECT {aggregate}" if aggregate else "SELECT *"
-
         sql_parts = [select_clause, f"FROM {table}"]
 
         if conditions:
             sql_parts.append(f"WHERE {conditions}")
-
         if group_by:
             sql_parts.append(f"GROUP BY {group_by}")
-
         if order:
             sql_parts.append(f"ORDER BY {order}")
-
         if limit:
             sql_parts.append(f"LIMIT {limit}")
 
-        # Join with newlines + indent for readability
         raw_sql = "\n    ".join(sql_parts)
-
-        # Run through output tuner for consistent formatting
         return _tuner.tune(raw_sql)
 
     # ------------------------------------------------------------------
@@ -402,7 +358,7 @@ class RuleBasedSQLGenerator:
     # ------------------------------------------------------------------
 
     def _extract_table(self, q: str) -> str:
-        """Guess table name from common entity nouns in the query."""
+        """Guess the table name from entity nouns present in the query."""
         entity_map = {
             "employee":     "employees",
             "employees":    "employees",
@@ -455,8 +411,7 @@ class RuleBasedSQLGenerator:
         """Extract WHERE clause conditions from the query."""
         conditions: list[str] = []
 
-        # ── Numeric comparisons ──────────────────────────────────────────
-        # Patterns where the field name CAN be extracted from the match
+        # Numeric comparisons — field name extractable from the match
         field_num_patterns = [
             (r"(\w+)\s+(?:greater|more|higher|above|over)\s+than\s+(\d+(?:\.\d+)?)",  ">"),
             (r"(\w+)\s+(?:less|lower|below|under)\s+than\s+(\d+(?:\.\d+)?)",          "<"),
@@ -464,7 +419,8 @@ class RuleBasedSQLGenerator:
             (r"(\w+)\s+(?:at\s+least|minimum\s+of)\s+(\d+(?:\.\d+)?)",               ">="),
             (r"(\w+)\s+(?:at\s+most|maximum\s+of)\s+(\d+(?:\.\d+)?)",                "<="),
         ]
-        # Patterns where the field must be guessed from context
+
+        # Numeric comparisons — field must be inferred from context
         context_num_patterns = [
             (r"(?:greater|more|higher|above|over)\s+than\s+(\d+(?:\.\d+)?)",  ">"),
             (r"(?:less|lower|below|under)\s+than\s+(\d+(?:\.\d+)?)",          "<"),
@@ -488,23 +444,22 @@ class RuleBasedSQLGenerator:
                 if m:
                     value = m.group(1)
                     field = self._guess_numeric_field(q)
-                    if field:  # BUG FIX: guard against None
+                    if field:
                         conditions.append(f"{field} {op} {value}")
                     break
 
-        # ── City / location ──────────────────────────────────────────────
-        # BUG FIX: removed walrus operator misuse; search the original query
-        # for proper capitalisation detection.
+        # City / location — guard: only match proper-cased words that are not
+        # known entity nouns, to avoid "FROM employees" → city = 'Employees'.
         loc_m = re.search(
             r"(?:from|in|at|located\s+in)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)",
             original_query,
-            re.IGNORECASE,
         )
         if loc_m:
-            city = loc_m.group(1).strip().title()
-            conditions.append(f"city = '{city}'")
+            candidate = loc_m.group(1).strip()
+            if candidate.lower() not in _ENTITY_NOUNS:
+                conditions.append(f"city = '{candidate.title()}'")
 
-        # ── Date / time ──────────────────────────────────────────────────
+        # Date / time filters
         if "this month" in q:
             conditions.append(
                 "MONTH(created_at) = MONTH(CURRENT_DATE())"
@@ -522,7 +477,7 @@ class RuleBasedSQLGenerator:
         elif "last year" in q:
             conditions.append("YEAR(created_at) = YEAR(CURRENT_DATE()) - 1")
 
-        # ── Status ───────────────────────────────────────────────────────
+        # Status filters
         if re.search(r"\bactive\b", q):
             conditions.append("status = 'active'")
         elif re.search(r"\binactive\b", q):
@@ -532,7 +487,7 @@ class RuleBasedSQLGenerator:
         elif re.search(r"\bcompleted\b", q):
             conditions.append("status = 'completed'")
 
-        # ── Gender ───────────────────────────────────────────────────────
+        # Gender filters
         if re.search(r"\b(female|women|woman)\b", q):
             conditions.append("gender = 'female'")
         elif re.search(r"\b(male|men|man)\b", q):
@@ -542,13 +497,11 @@ class RuleBasedSQLGenerator:
 
     def _extract_order(self, q: str) -> str | None:
         """Extract ORDER BY clause."""
-        # BUG FIX: use word-boundary regex instead of `kw in q.split()`
         for kw, direction in self.ORDER_KEYWORDS.items():
             if re.search(rf"\b{re.escape(kw)}\b", q):
                 field = self._guess_numeric_field(q) or "id"
                 return f"{field} {direction}"
 
-        # Explicit "top N" → handled elsewhere (limit); infer DESC ordering
         if re.search(r"\btop\s+\d+\b", q):
             field = self._guess_numeric_field(q) or "id"
             return f"{field} DESC"
@@ -561,33 +514,23 @@ class RuleBasedSQLGenerator:
         return None
 
     def _extract_limit(self, q: str) -> str | None:
-        """Extract LIMIT clause from 'top N' or 'first N' phrases."""
-        # BUG FIX: removed "last" from this pattern — "last N" is handled
-        # specially in generate() to add DESC ordering as well.
+        """Extract LIMIT value from 'top N' or 'first N' phrases."""
         m = re.search(r"\b(?:top|first|limit)\s+(\d+)\b", q)
-        if m:
-            return m.group(1)
-        return None
+        return m.group(1) if m else None
 
     def _extract_aggregate(self, q: str) -> str | None:
-        """Detect aggregate functions."""
+        """Detect and build aggregate function expressions."""
         for kw, agg in self.AGGREGATE_MAP.items():
             if re.search(rf"\b{re.escape(kw)}\b", q):
-                # BUG FIX: use == instead of `in (tuple,)` for readability/correctness
                 if agg == "COUNT(*)":
                     return agg
-                # Try to find which field to aggregate
-                field = self._guess_numeric_field(q)
-                if field:
-                    return f"{agg}({field})"
-                return f"{agg}(*)"
+                field = self._guess_numeric_field(q) or "id"
+                return f"{agg}({field})"
         return None
 
     def _extract_group_by(self, q: str) -> str | None:
-        """Detect GROUP BY hint words."""
-        m = re.search(
-            r"(?:group(?:ed)?\s+by|per|by\s+each|for\s+each)\s+(\w+)", q
-        )
+        """Detect GROUP BY hint phrases."""
+        m = re.search(r"(?:group(?:ed)?\s+by|per|by\s+each|for\s+each)\s+(\w+)", q)
         if m:
             return m.group(1)
         if re.search(r"\bper\s+city\b|\bby\s+city\b", q):
@@ -601,20 +544,19 @@ class RuleBasedSQLGenerator:
         return None
 
     def _normalise_field(self, word: str) -> str:
-        """Map a potentially noisy word to a clean column name."""
-        word = word.lower().strip()
-        return self.FIELD_ALIASES.get(word, word)
+        """Map a word to a clean column name (identity if not a known synonym)."""
+        return word.lower().strip()
 
     def _guess_numeric_field(self, q: str) -> str | None:
         """Pick the most likely numeric column from the query text."""
-        for field in self.FIELD_ALIASES:
+        for field in self._NUMERIC_FIELDS:
             if re.search(rf"\b{re.escape(field)}\b", q):
                 return field
         return None
 
 
 # ---------------------------------------------------------------------------
-# Public API used by app.py
+# Public API
 # ---------------------------------------------------------------------------
 
 _rule_gen = RuleBasedSQLGenerator()
@@ -634,7 +576,6 @@ def generate_sql(natural_query: str) -> dict:
 
     natural_query = natural_query.strip()
 
-    # Try OpenAI first
     api_key = os.getenv("OPENAI_API_KEY", "")
     if api_key:
         try:
@@ -642,11 +583,8 @@ def generate_sql(natural_query: str) -> dict:
             logger.info("SQL generated via OpenAI.")
             return {"sql": sql, "method": "openai"}
         except Exception as exc:
-            logger.warning(
-                "OpenAI generation failed: %s. Falling back to rule-based.", exc
-            )
+            logger.warning("OpenAI generation failed: %s. Falling back to rule-based.", exc)
 
-    # Fallback → rule-based
     try:
         sql = _rule_gen.generate(natural_query)
         logger.info("SQL generated via rule-based engine.")

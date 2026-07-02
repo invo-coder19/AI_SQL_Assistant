@@ -72,17 +72,22 @@
           <!-- Example queries -->
           <p class="examples-label">Try an example:</p>
           <div class="examples-chips" role="list" aria-label="Example queries">
-            <button class="example-chip" role="listitem" data-query="Show all employees with salary greater than 50000">Salary &gt; 50k</button>
-            <button class="example-chip" role="listitem" data-query="Find customers from Mumbai">Customers from Mumbai</button>
-            <button class="example-chip" role="listitem" data-query="Count total orders placed this month">Orders this month</button>
-            <button class="example-chip" role="listitem" data-query="Show top 10 products by sales">Top 10 products</button>
-            <button class="example-chip" role="listitem" data-query="List students who scored above 80 marks">Students &gt; 80</button>
-            <button class="example-chip" role="listitem" data-query="Find average salary by department">Avg salary by dept</button>
+            <button class="example-chip" data-query="Show all employees with salary greater than 50000">Salary &gt; 50k</button>
+            <button class="example-chip" data-query="Find customers from Mumbai">Customers from Mumbai</button>
+            <button class="example-chip" data-query="Count total orders placed this month">Orders this month</button>
+            <button class="example-chip" data-query="Show top 10 products by sales">Top 10 products</button>
+            <button class="example-chip" data-query="List students who scored above 80 marks">Students &gt; 80</button>
+            <button class="example-chip" data-query="Find average salary by department">Avg salary by dept</button>
           </div>
 
           <!-- Buttons -->
           <div class="btn-group">
-            <button class="btn btn-primary" id="generateBtn" aria-label="Generate SQL from input">
+            <button
+              class="btn btn-primary"
+              id="generateBtn"
+              aria-label="Generate SQL from input"
+              title="Generate SQL (Ctrl+Enter)"
+            >
               <span id="btnIcon">⚡</span>
               <span id="btnText">Generate SQL</span>
             </button>
@@ -90,6 +95,9 @@
               Clear
             </button>
           </div>
+
+          <!-- Keyboard shortcut hint -->
+          <p class="shortcut-hint"><kbd>Ctrl</kbd> + <kbd>Enter</kbd> to generate</p>
 
           <!-- Error banner -->
           <div class="error-banner" id="errorBanner" role="alert" aria-live="assertive">
@@ -146,9 +154,9 @@
 
       <!-- ── HISTORY ── -->
       <section class="history-section" aria-labelledby="historyTitle">
-        <p class="section-title" id="historyTitle">
+        <h3 class="section-title" id="historyTitle">
           <span>↺</span> Recent Queries
-        </p>
+        </h3>
         <div class="history-list" id="historyList" role="list">
           <p class="history-empty" id="historyEmpty">No queries yet. Generate your first SQL above!</p>
         </div>
@@ -156,6 +164,15 @@
 
     </main>
 
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer" role="contentinfo">
+      <span>🗄️</span>
+      <span>AI SQL Assistant</span>
+      <span class="footer-sep">·</span>
+      <span>Built with Flask &amp; OpenAI</span>
+      <span class="footer-sep">·</span>
+      <span>MIT © 2026</span>
+    </footer>
 
   </div><!-- /#app -->
 

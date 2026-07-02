@@ -6,9 +6,9 @@
 'use strict';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
-const API_URL      = '/generate';
-const MAX_HISTORY  = 8;
-const CHAR_LIMIT   = 1000;
+const API_URL     = '/generate';
+const MAX_HISTORY = 8;
+const CHAR_LIMIT  = 1000;
 
 const SQL_KEYWORDS = [
   'SELECT','FROM','WHERE','AND','OR','NOT','IN','IS','NULL','LIKE',
@@ -29,35 +29,36 @@ const SQL_FUNCTIONS = [
 ];
 
 // ─── DOM refs ─────────────────────────────────────────────────────────────────
-const queryInput       = document.getElementById('queryInput');
-const charCount        = document.getElementById('charCount');
-const generateBtn      = document.getElementById('generateBtn');
-const clearBtn         = document.getElementById('clearBtn');
-const btnIcon          = document.getElementById('btnIcon');
-const btnText          = document.getElementById('btnText');
-const errorBanner      = document.getElementById('errorBanner');
-const errorText        = document.getElementById('errorText');
-const outputPlaceholder= document.getElementById('outputPlaceholder');
-const sqlResultWrapper = document.getElementById('sqlResultWrapper');
-const sqlOutput        = document.getElementById('sqlOutput');
-const copyBtn          = document.getElementById('copyBtn');
-const methodBadge      = document.getElementById('methodBadge');
-const validationPanel  = document.getElementById('validationPanel');
-const historyList      = document.getElementById('historyList');
-const historyEmpty     = document.getElementById('historyEmpty');
-const toastContainer   = document.getElementById('toastContainer');
+const queryInput        = document.getElementById('queryInput');
+const charCount         = document.getElementById('charCount');
+const generateBtn       = document.getElementById('generateBtn');
+const clearBtn          = document.getElementById('clearBtn');
+const btnIcon           = document.getElementById('btnIcon');
+const btnText           = document.getElementById('btnText');
+const errorBanner       = document.getElementById('errorBanner');
+const errorText         = document.getElementById('errorText');
+const outputPlaceholder = document.getElementById('outputPlaceholder');
+const sqlResultWrapper  = document.getElementById('sqlResultWrapper');
+const sqlOutput         = document.getElementById('sqlOutput');
+const copyBtn           = document.getElementById('copyBtn');
+const methodBadge       = document.getElementById('methodBadge');
+const validationPanel   = document.getElementById('validationPanel');
+const historyList       = document.getElementById('historyList');
+const historyEmpty      = document.getElementById('historyEmpty');
+const toastContainer    = document.getElementById('toastContainer');
 
 // ─── State ────────────────────────────────────────────────────────────────────
-let history = [];
-let lastSQL = '';
+// Named `queryHistory` to avoid shadowing the browser's built-in window.history.
+let queryHistory = [];
+let lastSQL      = '';
+let lastMethod   = 'rule-based';
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  // Load history from localStorage
   try {
     const stored = JSON.parse(localStorage.getItem('sqlHistory') || '[]');
-    if (Array.isArray(stored)) { history = stored; renderHistory(); }
-  } catch { /* ignore */ }
+    if (Array.isArray(stored)) { queryHistory = stored; renderHistory(); }
+  } catch { /* ignore corrupt storage */ }
 
   attachEventListeners();
   queryInput.focus();
@@ -65,10 +66,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ─── Event listeners ──────────────────────────────────────────────────────────
 function attachEventListeners() {
-  // Character counter
   queryInput.addEventListener('input', handleInputChange);
 
-  // Generate on Ctrl/Cmd + Enter
+  // Ctrl/Cmd + Enter shortcut
   queryInput.addEventListener('keydown', (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generateSQL();
   });
@@ -91,7 +91,6 @@ function attachEventListeners() {
 function handleInputChange() {
   const len = queryInput.value.length;
   charCount.textContent = `${len} / ${CHAR_LIMIT}`;
-
   charCount.classList.toggle('warning', len > 800);
   charCount.classList.toggle('danger',  len > 950);
   hideError();
@@ -124,9 +123,10 @@ async function generateSQL() {
       throw new Error(data.error || `Server error (${response.status})`);
     }
 
-    lastSQL = data.sql || '';
-    displayResult(lastSQL, data.method || 'rule-based');
-    addToHistory(query, lastSQL);
+    lastSQL    = data.sql    || '';
+    lastMethod = data.method || 'rule-based';
+    displayResult(lastSQL, lastMethod);
+    addToHistory(query, lastSQL, lastMethod);
     showToast('SQL generated successfully', 'success');
 
   } catch (err) {
@@ -170,33 +170,28 @@ function hideResult() {
 
 // ─── Display result ───────────────────────────────────────────────────────────
 function displayResult(sql, method) {
-  // Syntax-highlight and render
   sqlOutput.innerHTML = highlightSQL(sql);
 
-  // Show wrapper, hide placeholder
   outputPlaceholder.style.display = 'none';
   sqlResultWrapper.classList.add('visible');
 
-  // Method badge
   methodBadge.classList.add('visible');
   if (method === 'openai') {
     methodBadge.textContent = '✦ OpenAI';
-    methodBadge.className = 'method-badge visible openai';
+    methodBadge.className   = 'method-badge visible openai';
   } else {
     methodBadge.textContent = '⚙ Rule-based';
-    methodBadge.className = 'method-badge visible rule';
+    methodBadge.className   = 'method-badge visible rule';
   }
 
-  // Validate
   runValidation(sql);
 }
 
 // ─── SQL Syntax Highlighter ───────────────────────────────────────────────────
 function highlightSQL(sql) {
-  // Escape HTML first
   let h = escapeHtml(sql);
 
-  // Comments  (-- ...)
+  // SQL comments  (-- ...)
   h = h.replace(/(--[^\n]*)/g, '<span class="cm">$1</span>');
 
   // String literals
@@ -205,7 +200,7 @@ function highlightSQL(sql) {
   // Numbers
   h = h.replace(/\b(\d+(?:\.\d+)?)\b/g, '<span class="num">$1</span>');
 
-  // SQL functions (must come before keywords)
+  // SQL functions (must come before keywords so COUNT isn't double-wrapped)
   const fnPattern = new RegExp(`\\b(${SQL_FUNCTIONS.join('|')})\\s*(?=\\()`, 'gi');
   h = h.replace(fnPattern, '<span class="fn">$1</span>');
 
@@ -221,10 +216,10 @@ function highlightSQL(sql) {
 
 function escapeHtml(str) {
   return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g,  '&amp;')
+    .replace(/</g,  '&lt;')
+    .replace(/>/g,  '&gt;')
+    .replace(/"/g,  '&quot;');
 }
 
 // ─── SQL Validation ───────────────────────────────────────────────────────────
@@ -233,9 +228,9 @@ function runValidation(sql) {
 
   const checks = [
     { id: 'valSelect',    pass: /\bSELECT\b|\bCOUNT\b|\bSUM\b|\bAVG\b|\bMAX\b|\bMIN\b/.test(upper), label: 'Contains SELECT or aggregate' },
-    { id: 'valFrom',      pass: /\bFROM\b/.test(upper),                                              label: 'Contains FROM clause'        },
-    { id: 'valSemicolon', pass: sql.trim().endsWith(';'),                                             label: 'Ends with semicolon'         },
-    { id: 'valKeywords',  pass: !/select|from|where|order|group/i.test(sql.replace(/'[^']*'/g,'')),  label: 'Keywords are uppercase'      },
+    { id: 'valFrom',      pass: /\bFROM\b/.test(upper),                                               label: 'Contains FROM clause'        },
+    { id: 'valSemicolon', pass: sql.trim().endsWith(';'),                                              label: 'Ends with semicolon'         },
+    { id: 'valKeywords',  pass: !/select|from|where|order|group/i.test(sql.replace(/'[^']*'/g, '')),  label: 'Keywords are uppercase'      },
   ];
 
   checks.forEach(({ id, pass, label }) => {
@@ -254,32 +249,23 @@ async function copySQL() {
 
   try {
     await navigator.clipboard.writeText(lastSQL);
-    copyBtn.textContent = '✓ Copied';
+    copyBtn.innerHTML = '✓ Copied';
     copyBtn.classList.add('copied');
     showToast('SQL copied to clipboard', 'success');
-
     setTimeout(() => {
-      copyBtn.textContent = '⎘ Copy';
+      copyBtn.innerHTML = '⎘ Copy';
       copyBtn.classList.remove('copied');
     }, 2000);
   } catch {
-    // Fallback for older browsers
-    const ta = document.createElement('textarea');
-    ta.value = lastSQL;
-    ta.style.position = 'fixed';
-    ta.style.opacity = '0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    showToast('SQL copied', 'success');
+    showToast('Copy failed — please select and copy manually', 'error');
   }
 }
 
 // ─── Clear ────────────────────────────────────────────────────────────────────
 function clearAll() {
   queryInput.value = '';
-  lastSQL = '';
+  lastSQL          = '';
+  lastMethod       = 'rule-based';
   charCount.textContent = `0 / ${CHAR_LIMIT}`;
   charCount.classList.remove('warning', 'danger');
   hideError();
@@ -288,19 +274,23 @@ function clearAll() {
 }
 
 // ─── History ──────────────────────────────────────────────────────────────────
-function addToHistory(query, sql) {
-  const entry = { query, sql, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-  history.unshift(entry);
-  if (history.length > MAX_HISTORY) history.pop();
+function addToHistory(query, sql, method) {
+  const entry = {
+    query,
+    sql,
+    method,
+    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+  queryHistory.unshift(entry);
+  if (queryHistory.length > MAX_HISTORY) queryHistory.pop();
 
-  try { localStorage.setItem('sqlHistory', JSON.stringify(history)); } catch { /* ignore */ }
+  try { localStorage.setItem('sqlHistory', JSON.stringify(queryHistory)); } catch { /* ignore */ }
   renderHistory();
 }
 
 function renderHistory() {
-  if (history.length === 0) {
+  if (queryHistory.length === 0) {
     historyEmpty.style.display = 'block';
-    // Remove any existing items
     document.querySelectorAll('.history-item').forEach(el => el.remove());
     return;
   }
@@ -308,12 +298,12 @@ function renderHistory() {
   historyEmpty.style.display = 'none';
   historyList.innerHTML = '';
 
-  history.forEach((entry, i) => {
+  queryHistory.forEach((entry, i) => {
     const item = document.createElement('div');
     item.className = 'history-item';
     item.setAttribute('role', 'listitem');
     item.setAttribute('tabindex', '0');
-    item.setAttribute('aria-label', `History item: ${entry.query}`);
+    item.setAttribute('aria-label', `History: ${entry.query}`);
     item.innerHTML = `
       <span class="history-query" title="${escapeHtml(entry.query)}">${escapeHtml(entry.query)}</span>
       <span class="history-time">${entry.time}</span>
@@ -325,26 +315,28 @@ function renderHistory() {
 }
 
 function restoreHistory(index) {
-  const entry = history[index];
+  const entry = queryHistory[index];
   if (!entry) return;
 
   queryInput.value = entry.query;
   handleInputChange();
-  lastSQL = entry.sql;
-  displayResult(entry.sql, 'rule-based');
+  lastSQL    = entry.sql;
+  lastMethod = entry.method || 'rule-based';
+  displayResult(entry.sql, lastMethod);
   queryInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
 // ─── Toast notifications ──────────────────────────────────────────────────────
 function showToast(message, type = 'success') {
+  const icons = { success: '✓', error: '✕' };
   const toast = document.createElement('div');
   toast.className = `toast ${type}`;
-  toast.textContent = message;
   toast.setAttribute('role', 'status');
+  toast.innerHTML = `<span class="toast-icon">${icons[type] ?? '●'}</span><span>${escapeHtml(message)}</span>`;
   toastContainer.appendChild(toast);
 
   setTimeout(() => {
     toast.style.animation = 'toastOut 0.3s ease forwards';
-    toast.addEventListener('animationend', () => toast.remove());
+    toast.addEventListener('animationend', () => toast.remove(), { once: true });
   }, 3000);
 }

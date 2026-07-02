@@ -4,7 +4,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9+-blue?logo=python)](https://python.org)
 [![Flask](https://img.shields.io/badge/Flask-3.0-black?logo=flask)](https://flask.palletsprojects.com)
-[![OpenAI](https://img.shields.io/badge/OpenAI-GPT--3.5-412991?logo=openai)](https://openai.com)
+[![OpenAI](https://img.shields.io/badge/OpenAI-gpt--4o--mini-412991?logo=openai)](https://openai.com)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
 ---
@@ -19,13 +19,14 @@
 
 | Feature | Description |
 |---|---|
-| 🤖 AI Generation | OpenAI GPT-3.5 converts English → SQL |
+| 🤖 AI Generation | OpenAI `gpt-4o-mini` converts English → SQL |
 | ⚙️ Offline Fallback | Rule-based engine when no API key is set |
 | 🎨 Syntax Highlighting | Color-coded SQL output |
 | ✅ SQL Validation | Checks keywords, semicolons, clauses |
 | 📋 Copy Button | One-click clipboard copy |
 | 🕑 History | Last 8 queries saved in localStorage |
 | 📱 Responsive | Works on desktop & mobile |
+| ⌨️ Keyboard Shortcut | `Ctrl+Enter` to generate instantly |
 
 ---
 
@@ -53,7 +54,12 @@ Open `.env` and set your key (optional — rule-based fallback works without it)
 
 ```
 OPENAI_API_KEY=sk-your-key-here
+OPENAI_MODEL=gpt-4o-mini      # optional; change to any supported model
+FLASK_DEBUG=false
+PORT=5000
 ```
+
+> **Note:** The app uses `python-dotenv` to load `.env` automatically at startup.
 
 ### 3 — Run
 
@@ -77,7 +83,7 @@ AI_SQL_Assistant/
 ├── templates/
 │   └── index.html          # Main UI
 └── static/
-    ├── style.css           # Premium dark-mode styles
+    ├── style.css           # Refined dark-mode styles
     └── script.js           # Frontend logic
 ```
 
@@ -118,10 +124,10 @@ Find average salary by department
 
 ## 🛠️ Tech Stack
 
-- **Backend:** Python · Flask · Flask-CORS
-- **AI:** OpenAI GPT-3.5-turbo · Rule-based NLP fallback
+- **Backend:** Python · Flask · Flask-CORS · python-dotenv
+- **AI:** OpenAI `gpt-4o-mini` · Rule-based NLP fallback
 - **Frontend:** Vanilla HTML · CSS · JavaScript
-- **Design:** Minimal dark theme · Green / Grey / Black · JetBrains Mono · Inter
+- **Design:** Refined dark theme · Green / Grey / Black · JetBrains Mono · Inter
 
 ---
 
